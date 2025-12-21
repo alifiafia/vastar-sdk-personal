@@ -350,8 +350,8 @@ pkill vastar-connector-runtime
 ### Project Structure
 
 ```
-connector-sdk-go/
-├── client.go                       # Main IPC client
+sdk-golang/
+├── client.go                      # Main IPC client
 ├── go.mod / go.sum                # Dependencies
 ├── start_runtime.sh               # Start runtime (with auto-cleanup)
 ├── clean_vcr.sh                   # Clean up runtime instances

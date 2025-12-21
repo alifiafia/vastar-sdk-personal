@@ -258,7 +258,8 @@ func (c *RuntimeClient) ExecuteHTTP(req *HTTPRequest) (*HTTPResponse, error) {
 		httpPayload["headers"] = req.Headers
 	}
 	if req.Body != nil {
-		httpPayload["body"] = req.Body
+		// Convert body to string to ensure valid JSON encoding
+		httpPayload["body"] = string(req.Body)
 	}
 
 	payloadJSON, err := json.Marshal(httpPayload)

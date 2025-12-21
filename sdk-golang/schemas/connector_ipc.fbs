@@ -1,0 +1,144 @@
+// ============================================================================
+// Vastar Connector IPC Protocol Schema (FlatBuffers)
+// ============================================================================
+//
+// Protocol untuk komunikasi antara Vastar Host dan Connector Runtime
+// via Unix Domain Socket (UDS).
+//
+// Performance target:
+// - Zero-copy deserialization
+// - Sub-microsecond encoding/decoding
+// - Memory-efficient (no intermediate allocations)
+
+namespace Vastar.Connector.Ipc;
+
+/// Error classification untuk retry policy
+enum ErrorClass : byte {
+    /// Success - no error
+    Success = 0,
+
+    /// Transient error - safe to retry
+    Transient = 1,
+
+    /// Permanent error - do not retry
+    Permanent = 2,
+
+    /// Rate limited - retry with backoff
+    RateLimited = 3,
+
+    /// Timeout - may retry with caution
+    Timeout = 4,
+
+    /// Invalid request - do not retry
+    InvalidRequest = 5,
+}
+
+/// Message type untuk frame header
+enum MessageType : byte {
+    /// Execute operation request
+    ExecuteRequest = 0,
+
+    /// Execute operation response
+    ExecuteResponse = 1,
+
+    /// Health check ping
+    HealthCheck = 2,
+
+    /// Health check response
+    HealthResponse = 3,
+
+    /// Credit update (backpressure)
+    CreditUpdate = 4,
+}
+
+/// Request untuk eksekusi operasi connector
+table ExecuteRequest {
+    /// Unique request ID untuk correlation
+    request_id: uint64;
+
+    /// Tenant ID (for multi-tenancy)
+    tenant_id: string (required);
+
+    /// Workspace ID (optional)
+    workspace_id: string;
+
+    /// Trace ID untuk distributed tracing
+    trace_id: string;
+
+    /// Connector name (e.g., "http", "postgres")
+    connector_name: string (required);
+
+    /// Operation name (e.g., "request", "query")
+    operation: string (required);
+
+    /// Deadline absolute timestamp (milliseconds)
+    deadline_at_ms: uint64;
+
+    /// Payload data (operation-specific)
+    payload: [ubyte];
+
+    /// Optional headers/metadata
+    headers: [KeyValue];
+}
+
+/// Response dari connector
+table ExecuteResponse {
+    /// Request ID yang sama dengan request
+    request_id: uint64;
+
+    /// Success atau error
+    error_class: ErrorClass;
+
+    /// Error message jika gagal
+    error_message: string;
+
+    /// Response payload jika sukses
+    payload: [ubyte];
+
+    /// Execution duration (microseconds)
+    duration_us: uint64;
+}
+
+/// Health check response
+table HealthCheckResponse {
+    /// Is healthy
+    healthy: bool;
+
+    /// Status message
+    message: string;
+
+    /// Current active requests
+    active_requests: uint32;
+
+    /// Available credits
+    available_credits: uint32;
+}
+
+/// Credit update untuk backpressure
+table CreditUpdate {
+    /// Credits to add (positive) or remove (negative)
+    credit_delta: int32;
+
+    /// Current total credits available
+    total_credits: uint32;
+}
+
+/// Key-value pair untuk headers/metadata
+table KeyValue {
+    key: string (required);
+    value: string (required);
+}
+
+/// Frame header (fixed 16 bytes)
+/// Layout:
+/// - magic: 4 bytes ("VCPI")
+/// - version: 1 byte
+/// - message_type: 1 byte
+/// - reserved: 2 bytes
+/// - payload_length: 4 bytes (little-endian)
+/// - correlation_id: 4 bytes (little-endian)
+///
+/// Total frame = header (16 bytes) + payload (variable)
+
+root_type ExecuteRequest;
+

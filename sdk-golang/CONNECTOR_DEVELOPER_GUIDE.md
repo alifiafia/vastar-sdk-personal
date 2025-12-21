@@ -2,9 +2,6 @@
 
 **Build production-ready connectors with Vastar Go SDK**
 
-**Last Updated:** December 21, 2025  
-**SDK Version:** 1.0.0  
-**Target Audience:** Go Developers building custom connectors
 
 ---
 
@@ -61,13 +58,20 @@ go version
 
 ### 2. Vastar Runtime Binary
 
-Download or locate runtime binary:
+The repository includes runtime binary and helper scripts:
+
 ```bash
 # Check if runtime exists
-ls -lh ../connector-runtime/vastar-connector-runtime
+ls -lh connector-runtime/vastar-connector-runtime
 
-# Should show: -rwxrwxr-x ... vastar-connector-runtime
+# Helper scripts available:
+# - start_runtime.sh  : Start runtime with auto-cleanup
+# - clean_vcr.sh      : Clean up runtime instances
 ```
+
+**Helper Scripts:**
+- `start_runtime.sh` - Automatically cleans up old instances and starts fresh runtime
+- `clean_vcr.sh` - Kills all runtime instances and removes socket/log files
 
 ### 3. FlatBuffers Compiler (Optional)
 
@@ -144,9 +148,11 @@ go run main.go
 ### Step 1: Start Runtime
 
 ```bash
-# Terminal 1: Start runtime
-cd /path/to/vastar-wf-connector-sdk-bin/sdk-golang
+# From repository root
+cd /path/to/vastar-wf-connector-sdk-bin
 ./start_runtime.sh
+
+# This will automatically clean up old instances and start fresh
 ```
 
 ### Step 2: Create Your Connector
@@ -712,13 +718,13 @@ failed to connect to runtime: dial unix /tmp/vastar-connector-runtime.sock: conn
 
 **Solution:**
 ```bash
-# Check if runtime is running
-pgrep -a vastar-connector-runtime
+# Clean up any old instances
+./clean_vcr.sh
 
-# If not, start it
+# Start fresh runtime
 ./start_runtime.sh
 
-# Check logs
+# Check logs if it fails
 tail -f /tmp/vastar-runtime.log
 ```
 
@@ -781,12 +787,6 @@ See [`../connector-runtime/RUNTIME_INTEGRATION_GUIDE.md`](../connector-runtime/R
 **Questions or Issues?**
 
 - Read [`README.md`](./README.md) for API reference
-- Check [`SUCCESS_REPORT.md`](./SUCCESS_REPORT.md) for implementation status
 - Review examples in [`examples/`](./examples/)
 
----
-
-**© 2025 Vastar Technologies**  
-**Version:** 1.0.0  
-**Last Updated:** December 21, 2025
 

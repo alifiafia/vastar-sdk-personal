@@ -346,16 +346,6 @@ pkill vastar-connector-runtime
 
 ## 🛠️ Development
 
-### Regenerate FlatBuffers Bindings
-
-```bash
-# Install flatc compiler
-sudo apt install flatbuffers-compiler  # Ubuntu/Debian
-brew install flatbuffers               # macOS
-
-# Generate Go code
-./generate.sh
-```
 
 ### Project Structure
 
@@ -363,19 +353,12 @@ brew install flatbuffers               # macOS
 connector-sdk-go/
 ├── client.go                       # Main IPC client
 ├── go.mod / go.sum                # Dependencies
-├── start_runtime.sh               # Start runtime script
-├── generate.sh                    # Generate FlatBuffers bindings
+├── start_runtime.sh               # Start runtime (with auto-cleanup)
+├── clean_vcr.sh                   # Clean up runtime instances
 ├── schemas/
 │   └── connector_ipc.fbs          # FlatBuffers schema
-├── protocol/
-│   └── connector_ipc_generated.go # Generated Go code
-├── examples/
-│   ├── simple_get.go              # GET example
-│   ├── simple_post.go             # POST example
-│   └── test_connection.go         # Connection test
-└── scripts/
-    ├── test_flatbuffers_protocol.py  # Test script (Python)
-    └── test_runtime_flatbuffers.sh   # Test script (Bash)
+└── protocol/
+    └── connector_ipc_generated.go # Generated Go code
 ```
 
 ---
@@ -384,17 +367,19 @@ connector-sdk-go/
 
 ### "Failed to connect"
 
-**Solution:** Start runtime first
+**Solution:** Clean up and start fresh runtime
 ```bash
-./start_runtime.sh
+./clean_vcr.sh      # Clean up old instances
+./start_runtime.sh  # Start fresh runtime
 ```
 
-### "Invalid FlatBuffers message"
+### Multiple runtime instances
 
-**Solution:** Regenerate bindings
+**Solution:** Use cleanup script
 ```bash
-./generate.sh
+./clean_vcr.sh  # Kills all instances and removes socket
 ```
+
 
 ### Timeout Errors
 
@@ -440,13 +425,9 @@ Proprietary - Vastar Technologies
 
 ## 📞 Support
 
-- **Protocol Spec**: `../connector-runtime/RUNTIME_INTEGRATION_GUIDE.md`
-- **Quick Reference**: `../connector-runtime/FLATBUFFERS_IPC_QUICK_REF.md`
 - **Examples**: `examples/`
 
 ---
 
-**Status:** ✅ Production Ready  
-**Last Updated:** December 21, 2025  
-**Version:** 1.0.0
+**Status:** ✅ Production Ready
 

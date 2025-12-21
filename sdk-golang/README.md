@@ -4,6 +4,8 @@
 
 📚 **[→ Connector Developer Guide](./CONNECTOR_DEVELOPER_GUIDE.md)** - Complete guide for building connectors
 
+> **Note:** This is the Go SDK. We are developing SDKs for 8 additional languages (Python, JavaScript/TypeScript, Java, C#, Rust, PHP, Ruby, Kotlin). All SDKs will use the same FlatBuffers IPC protocol for seamless interoperability.
+
 ---
 
 ## 🚀 Quick Start

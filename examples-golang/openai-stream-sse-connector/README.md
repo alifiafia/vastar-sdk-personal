@@ -305,6 +305,42 @@ type Message struct {
 
 ## 🔧 Configuration
 
+### Using with Real OpenAI API
+
+To connect to real OpenAI instead of simulator:
+
+**1. Get API Key from [OpenAI Platform](https://platform.openai.com/)**
+
+**2. Set environment variable:**
+```bash
+export OPENAI_API_KEY="sk-proj-your-api-key-here"
+```
+
+**3. Update connector initialization:**
+```go
+connector, err := NewOpenAIConnectorWithAuth(
+    "https://api.openai.com",  // Real OpenAI URL
+    os.Getenv("OPENAI_API_KEY"),
+)
+```
+
+**4. Add Authorization header in requests:**
+```go
+httpReq := vastar.POST(c.baseURL + "/v1/chat/completions").
+    WithHeader("Authorization", "Bearer "+c.apiKey).
+    WithHeader("Content-Type", "application/json").
+    // ... rest of config
+```
+
+See [EXAMPLES.md - Configuration for Real OpenAI API](./EXAMPLES.md#configuration-for-real-openai-api) for complete guide including:
+- Authentication setup
+- Environment variables
+- Configuration file (YAML)
+- Supported models (GPT-4, GPT-3.5-turbo)
+- Rate limiting handling
+- Cost monitoring
+- Complete working example
+
 ### Simulator URL
 
 Default: `http://localhost:4545`
@@ -393,6 +429,25 @@ cd ../..
 pgrep -a vastar-connector-runtime
 ls -la /tmp/vastar-connector-runtime.sock
 ```
+
+### Error: "Unexpected status code: 400"
+
+**Possible Causes:**
+
+1. **Insufficient Quota:**
+   ```json
+   "error": {
+     "message": "You exceeded your current quota...",
+     "type": "insufficient_quota"
+   }
+   ```
+   **Solution:** Add credits to your OpenAI account at https://platform.openai.com/account/billing
+
+2. **Invalid API Key:**
+   **Solution:** Check your API key at https://platform.openai.com/api-keys
+
+3. **Invalid Model Name:**
+   **Solution:** Use valid model names: `gpt-4`, `gpt-3.5-turbo`, etc.
 
 ### Error: "Connection test failed"
 

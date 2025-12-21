@@ -1,0 +1,35 @@
+# OpenAI Stream Connector Configuration
+# Copy this file to config.yaml and update with your settings
+
+# Mode: "openai" or "simulator"
+# - openai: Use real OpenAI API (requires API key)
+# - simulator: Use local RAI Simulator (no API key needed)
+mode: "simulator"
+
+# OpenAI API Settings (when mode = "openai")
+openai:
+  # Get your API key from: https://platform.openai.com/api-keys
+  api_key: "sk-proj-xxxxxxxxxxxxxxxxxxxx"
+
+  # Model: gpt-4, gpt-4-turbo-preview, gpt-3.5-turbo, gpt-3.5-turbo-16k
+  model: "gpt-3.5-turbo"
+
+# Simulator Settings (when mode = "simulator")
+simulator:
+  # Local RAI Simulator endpoint
+  base_url: "http://localhost:4545"
+
+  # Model name (simulator accepts any model name)
+  model: "gpt-3.5-turbo"
+
+# Common Settings (applies to both modes)
+common:
+  # Request timeout in milliseconds (5 minutes)
+  timeout: 300000
+
+  # Maximum tokens in response
+  max_tokens: 2000
+
+  # Temperature (0.0 to 2.0) - Lower = focused, Higher = creative
+  temperature: 0.7
+

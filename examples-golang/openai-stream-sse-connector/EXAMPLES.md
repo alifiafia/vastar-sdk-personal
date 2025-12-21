@@ -643,6 +643,473 @@ for {
 
 ---
 
+## 🔧 Configuration for Real OpenAI API
+
+### Using Real OpenAI Instead of Simulator
+
+The examples above use RAI Simulator (`http://localhost:4545`). To connect to real OpenAI API:
+
+#### 1. Get OpenAI API Key
+
+Sign up at [OpenAI Platform](https://platform.openai.com/) and get your API key.
+
+#### 2. Update Connector Configuration
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+)
+
+func main() {
+    // Get API key from environment variable
+    apiKey := os.Getenv("OPENAI_API_KEY")
+    if apiKey == "" {
+        log.Fatal("OPENAI_API_KEY environment variable is required")
+    }
+
+    // Connect to real OpenAI API
+    connector, err := NewOpenAIConnectorWithAuth(
+        "https://api.openai.com",  // Real OpenAI base URL
+        apiKey,                     // Your API key
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer connector.Close()
+
+    // Use as normal
+    req := ChatCompletionRequest{
+        Model: "gpt-4",  // or "gpt-3.5-turbo"
+        Messages: []Message{
+            {Role: "user", Content: "Hello, ChatGPT!"},
+        },
+        Stream: true,
+    }
+
+    chunks, errors := connector.ChatCompletionStream(req)
+    
+    for {
+        select {
+        case chunk, ok := <-chunks:
+            if !ok {
+                goto done
+            }
+            fmt.Print(chunk)
+        case err := <-errors:
+            if err != nil {
+                log.Fatal(err)
+            }
+        }
+    }
+done:
+    fmt.Println("\n[DONE]")
+}
+```
+
+#### 3. Add Authentication Support
+
+Update `NewOpenAIConnector` to support API key:
+
+```go
+type OpenAIConnector struct {
+    client  *vastar.RuntimeClient
+    baseURL string
+    apiKey  string  // Add this
+}
+
+func NewOpenAIConnectorWithAuth(baseURL, apiKey string) (*OpenAIConnector, error) {
+    client, err := vastar.NewRuntimeClient()
+    if err != nil {
+        return nil, fmt.Errorf("failed to create runtime client: %w", err)
+    }
+
+    return &OpenAIConnector{
+        client:  client,
+        baseURL: baseURL,
+        apiKey:  apiKey,
+    }, nil
+}
+
+// Update ChatCompletionStream to include Authorization header
+func (c *OpenAIConnector) ChatCompletionStream(req ChatCompletionRequest) (<-chan string, <-chan error) {
+    // ...existing code...
+    
+    httpReq := vastar.POST(c.baseURL + "/v1/chat/completions").
+        WithHeader("Content-Type", "application/json").
+        WithHeader("Accept", "text/event-stream").
+        WithHeader("Authorization", "Bearer "+c.apiKey).  // Add this
+        WithBody(reqBody).
+        WithTimeout(300000)
+    
+    // ...existing code...
+}
+```
+
+#### 4. Environment Variables
+
+Create `.env` file or set environment variables:
+
+```bash
+# For OpenAI
+export OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
+
+# For Azure OpenAI
+export AZURE_OPENAI_KEY="your-azure-key"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+export AZURE_OPENAI_DEPLOYMENT="your-deployment-name"
+```
+
+#### 5. Run with Real API
+
+```bash
+# Set API key
+export OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
+
+# Run example
+go run main.go
+```
+
+#### 6. Configuration File (Alternative)
+
+Create `config.yaml`:
+
+```yaml
+openai:
+  api_key: "sk-proj-xxxxxxxxxxxxxxxxxxxx"
+  base_url: "https://api.openai.com"
+  model: "gpt-4"
+  timeout: 300000  # 5 minutes
+  max_tokens: 2000
+  temperature: 0.7
+
+# Or for Azure OpenAI
+azure_openai:
+  api_key: "your-azure-key"
+  endpoint: "https://your-resource.openai.azure.com"
+  deployment: "your-deployment-name"
+  api_version: "2024-02-15-preview"
+```
+
+Load configuration:
+
+```go
+import (
+    "gopkg.in/yaml.v3"
+    "os"
+)
+
+type Config struct {
+    OpenAI struct {
+        APIKey      string  `yaml:"api_key"`
+        BaseURL     string  `yaml:"base_url"`
+        Model       string  `yaml:"model"`
+        Timeout     int     `yaml:"timeout"`
+        MaxTokens   int     `yaml:"max_tokens"`
+        Temperature float64 `yaml:"temperature"`
+    } `yaml:"openai"`
+}
+
+func LoadConfig(path string) (*Config, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return nil, err
+    }
+
+    var config Config
+    if err := yaml.Unmarshal(data, &config); err != nil {
+        return nil, err
+    }
+
+    return &config, nil
+}
+
+func main() {
+    config, err := LoadConfig("config.yaml")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    connector, err := NewOpenAIConnectorWithAuth(
+        config.OpenAI.BaseURL,
+        config.OpenAI.APIKey,
+    )
+    // ...
+}
+```
+
+#### 7. Supported Models
+
+**OpenAI Models:**
+- `gpt-4` - Most capable, slower
+- `gpt-4-turbo-preview` - Faster GPT-4
+- `gpt-3.5-turbo` - Fast and economical
+- `gpt-3.5-turbo-16k` - Longer context
+
+**Usage:**
+```go
+req := ChatCompletionRequest{
+    Model: "gpt-3.5-turbo",  // Change model here
+    Messages: []Message{
+        {Role: "user", Content: "Your question"},
+    },
+    Stream:      true,
+    MaxTokens:   1000,
+    Temperature: 0.7,
+}
+```
+
+#### 8. Rate Limiting
+
+OpenAI has rate limits. Handle them:
+
+```go
+func (c *OpenAIConnector) ChatCompletionWithRetry(req ChatCompletionRequest, maxRetries int) (string, error) {
+    for i := 0; i < maxRetries; i++ {
+        content, err := c.ChatCompletion(req)
+        
+        if err == nil {
+            return content, nil
+        }
+        
+        // Check if rate limited
+        if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "rate_limit") {
+            waitTime := time.Duration(math.Pow(2, float64(i))) * time.Second
+            log.Printf("Rate limited, waiting %v before retry %d/%d", waitTime, i+1, maxRetries)
+            time.Sleep(waitTime)
+            continue
+        }
+        
+        return "", err
+    }
+    
+    return "", fmt.Errorf("max retries exceeded")
+}
+```
+
+#### 9. Cost Monitoring
+
+Track token usage:
+
+```go
+type UsageTracker struct {
+    TotalPromptTokens     int
+    TotalCompletionTokens int
+    TotalCost             float64
+}
+
+func (u *UsageTracker) AddUsage(promptTokens, completionTokens int, model string) {
+    u.TotalPromptTokens += promptTokens
+    u.TotalCompletionTokens += completionTokens
+    
+    // Pricing (as of 2024, check current pricing)
+    var cost float64
+    switch model {
+    case "gpt-4":
+        cost = (float64(promptTokens) * 0.03 / 1000) + (float64(completionTokens) * 0.06 / 1000)
+    case "gpt-3.5-turbo":
+        cost = (float64(promptTokens) * 0.0015 / 1000) + (float64(completionTokens) * 0.002 / 1000)
+    }
+    
+    u.TotalCost += cost
+}
+
+func (u *UsageTracker) Report() {
+    fmt.Printf("Total Prompt Tokens: %d\n", u.TotalPromptTokens)
+    fmt.Printf("Total Completion Tokens: %d\n", u.TotalCompletionTokens)
+    fmt.Printf("Estimated Cost: $%.4f\n", u.TotalCost)
+}
+```
+
+#### 10. Complete Example with Real OpenAI
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+    
+    vastar "github.com/fullstack-aidev/vastar-wf-connector-sdk-bin/sdk-golang"
+)
+
+func main() {
+    // Get API key
+    apiKey := os.Getenv("OPENAI_API_KEY")
+    if apiKey == "" {
+        log.Fatal("Please set OPENAI_API_KEY environment variable")
+    }
+
+    // Create connector with real OpenAI
+    connector, err := NewOpenAIConnectorWithAuth(
+        "https://api.openai.com",
+        apiKey,
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer connector.Close()
+
+    fmt.Println("🤖 Connected to OpenAI API")
+    fmt.Println("Enter your question (or 'exit' to quit):")
+    
+    messages := []Message{}
+    
+    for {
+        // Read user input
+        fmt.Print("\nYou: ")
+        var input string
+        fmt.Scanln(&input)
+        
+        if input == "exit" {
+            break
+        }
+        
+        // Add user message
+        messages = append(messages, Message{
+            Role:    "user",
+            Content: input,
+        })
+        
+        // Get AI response
+        req := ChatCompletionRequest{
+            Model:       "gpt-3.5-turbo",
+            Messages:    messages,
+            Stream:      true,
+            MaxTokens:   500,
+            Temperature: 0.7,
+        }
+        
+        fmt.Print("AI: ")
+        
+        var fullResponse string
+        chunks, errors := connector.ChatCompletionStream(req)
+        
+        for {
+            select {
+            case chunk, ok := <-chunks:
+                if !ok {
+                    goto done
+                }
+                fmt.Print(chunk)
+                fullResponse += chunk
+            case err := <-errors:
+                if err != nil {
+                    log.Printf("Error: %v", err)
+                    goto done
+                }
+            }
+        }
+    done:
+        fmt.Println()
+        
+        // Add assistant response to history
+        messages = append(messages, Message{
+            Role:    "assistant",
+            Content: fullResponse,
+        })
+    }
+    
+    fmt.Println("\n👋 Goodbye!")
+}
+```
+
+### Summary: Simulator vs Real OpenAI
+
+| Aspect | RAI Simulator | Real OpenAI API |
+|--------|---------------|-----------------|
+| **Base URL** | `http://localhost:4545` | `https://api.openai.com` |
+| **Authentication** | None required | API Key required (`Bearer token`) |
+| **API Key** | Not needed | Get from OpenAI Platform |
+| **Endpoint** | `/v1/chat/completions` | `/v1/chat/completions` |
+| **Cost** | Free | Paid (per token) |
+| **Rate Limits** | None | Yes (tier-based) |
+| **Models** | Simulated | Real GPT models |
+| **Response** | Mock data | Real AI responses |
+| **Use Case** | Development/Testing | Production |
+
+---
+
+---
+
+## 🚨 Common OpenAI API Errors
+
+### Error: Insufficient Quota
+
+**Error Message:**
+```json
+{
+  "error": {
+    "message": "You exceeded your current quota, please check your plan and billing details.",
+    "type": "insufficient_quota",
+    "code": "insufficient_quota"
+  }
+}
+```
+
+**Cause:** No credits remaining in your OpenAI account.
+
+**Solutions:**
+1. **Add Credits:** https://platform.openai.com/account/billing
+2. **Check Usage:** https://platform.openai.com/account/usage  
+3. **Use Simulator:** Test with local simulator (free) instead
+
+### Error: Invalid API Key
+
+**Error Message:**
+```json
+{
+  "error": {
+    "message": "Incorrect API key provided...",
+    "type": "invalid_request_error"
+  }
+}
+```
+
+**Solutions:**
+1. Verify key at: https://platform.openai.com/api-keys
+2. Ensure key format: `sk-` or `sk-proj-...`
+3. Check key hasn't been revoked
+
+### Error: Rate Limit Exceeded
+
+**Error Message:**
+```json
+{
+  "error": {
+    "message": "Rate limit reached...",
+    "type": "rate_limit_error"
+  }
+}
+```
+
+**Solutions:**
+1. Wait before retrying
+2. Implement exponential backoff
+3. Upgrade your OpenAI plan for higher limits
+
+### Error: Invalid Model
+
+**Error Message:**
+```json
+{
+  "error": {
+    "message": "The model `xxx` does not exist",
+    "type": "invalid_request_error"
+  }
+}
+```
+
+**Solutions:**
+1. Use valid models: `gpt-4`, `gpt-4-turbo-preview`, `gpt-3.5-turbo`
+2. Check model availability: https://platform.openai.com/docs/models
+
+---
+
 ## 🔍 Debugging Tips
 
 ### Enable Verbose Logging

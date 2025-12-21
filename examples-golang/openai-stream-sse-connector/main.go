@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -50,9 +51,14 @@ type StreamChunk struct {
 type OpenAIConnector struct {
 	client  *vastar.RuntimeClient
 	baseURL string
+	apiKey  string
 }
 
 func NewOpenAIConnector(baseURL string) (*OpenAIConnector, error) {
+	return NewOpenAIConnectorWithAuth(baseURL, "")
+}
+
+func NewOpenAIConnectorWithAuth(baseURL, apiKey string) (*OpenAIConnector, error) {
 	client, err := vastar.NewRuntimeClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime client: %w", err)
@@ -61,6 +67,7 @@ func NewOpenAIConnector(baseURL string) (*OpenAIConnector, error) {
 	return &OpenAIConnector{
 		client:  client,
 		baseURL: baseURL,
+		apiKey:  apiKey,
 	}, nil
 }
 
@@ -70,7 +77,7 @@ func (c *OpenAIConnector) Close() error {
 
 // TestConnection tests connection to OpenAI simulator
 func (c *OpenAIConnector) TestConnection() (string, error) {
-	req := vastar.POST(c.baseURL + "/test_completion").
+	req := vastar.POST(c.baseURL+"/test_completion").
 		WithHeader("Content-Type", "application/json").
 		WithTimeout(30000)
 
@@ -119,12 +126,20 @@ func (c *OpenAIConnector) ChatCompletionStream(req ChatCompletionRequest) (<-cha
 			return
 		}
 
+		// Debug: log request body (remove this in production)
+		// fmt.Printf("DEBUG: Request JSON: %s\n", string(reqBody))
+
 		// Make HTTP request via Vastar
-		httpReq := vastar.POST(c.baseURL + "/v1/chat/completions").
+		httpReq := vastar.POST(c.baseURL+"/v1/chat/completions").
 			WithHeader("Content-Type", "application/json").
 			WithHeader("Accept", "text/event-stream").
 			WithBody(reqBody).
 			WithTimeout(300000) // 5 minutes for streaming
+
+		// Add Authorization header if API key is provided
+		if c.apiKey != "" {
+			httpReq = httpReq.WithHeader("Authorization", "Bearer "+c.apiKey)
+		}
 
 		resp, err := c.client.ExecuteHTTP(httpReq)
 		if err != nil {
@@ -133,7 +148,8 @@ func (c *OpenAIConnector) ChatCompletionStream(req ChatCompletionRequest) (<-cha
 		}
 
 		if resp.StatusCode != 200 {
-			errorChan <- fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+			// Show error details from OpenAI
+			errorChan <- fmt.Errorf("unexpected status code: %d - %s", resp.StatusCode, string(resp.Body))
 			return
 		}
 
@@ -226,43 +242,72 @@ func main() {
 	fmt.Println("=" + strings.Repeat("=", 60))
 	fmt.Println()
 
+	// Get configuration from environment
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+
+	// Default to simulator if not specified
+	if baseURL == "" {
+		if apiKey != "" {
+			baseURL = "https://api.openai.com"
+			fmt.Println("🌐 Using Real OpenAI API")
+		} else {
+			baseURL = "http://localhost:4545"
+			fmt.Println("🧪 Using RAI Simulator (localhost:4545)")
+		}
+	}
+
+	fmt.Printf("🔗 Base URL: %s\n", baseURL)
+	if apiKey != "" {
+		fmt.Printf("🔑 API Key: %s...%s\n", apiKey[:7], apiKey[len(apiKey)-4:])
+	}
+	fmt.Println()
+
 	// Create connector
-	baseURL := "http://localhost:4545" // RAI Simulator running in Docker
-	connector, err := NewOpenAIConnector(baseURL)
+	var connector *OpenAIConnector
+	var err error
+
+	if apiKey != "" {
+		connector, err = NewOpenAIConnectorWithAuth(baseURL, apiKey)
+	} else {
+		connector, err = NewOpenAIConnector(baseURL)
+	}
+
 	if err != nil {
 		log.Fatalf("Failed to create connector: %v", err)
 	}
 	defer connector.Close()
 
-	// Test connection
-	fmt.Println("📡 Testing connection to OpenAI Simulator...")
-	testMsg, err := connector.TestConnection()
-	if err != nil {
-		fmt.Printf("❌ Connection test failed: %v\n\n", err)
-		fmt.Println("⚠️  RAI Endpoint Simulator is not running!")
+	// Test connection (skip for real OpenAI as it doesn't have /test_completion)
+	if baseURL == "http://localhost:4545" {
+		fmt.Println("📡 Testing connection to OpenAI Simulator...")
+		testMsg, err := connector.TestConnection()
+		if err != nil {
+			fmt.Printf("❌ Connection test failed: %v\n\n", err)
+			fmt.Println("⚠️  RAI Endpoint Simulator is not running!")
+			fmt.Println()
+			fmt.Println("To run this example, you need RAI Endpoint Simulator:")
+			fmt.Println("1. Docker: docker run -d -p 4545:4545 rai-endpoint-simulator:latest")
+			fmt.Println("2. Or from source: cd rai-endpoint-simulator && cargo run")
+			fmt.Println()
+			fmt.Println("Or set OPENAI_API_KEY to use real OpenAI API.")
+			fmt.Println()
+			return
+		}
+
+		fmt.Printf("✅ %s\n\n", testMsg)
+	} else {
+		fmt.Println("📡 Skipping test_completion (not available for real OpenAI API)")
 		fmt.Println()
-		fmt.Println("To run this example, you need RAI Endpoint Simulator:")
-		fmt.Println("1. Clone: git clone https://github.com/fullstack-aidev/rai-endpoint-simulator.git")
-		fmt.Println("2. Run: cd rai-endpoint-simulator && cargo run")
-		fmt.Println("3. Verify: curl http://localhost:8080/test_completion")
-		fmt.Println()
-		fmt.Println("Or change baseURL to your OpenAI-compatible endpoint.")
-		fmt.Println()
-		return
 	}
-	fmt.Printf("✅ %s\n\n", testMsg)
 
 	// Example 1: Streaming chat completion
 	fmt.Println("Example 1: Streaming Chat Completion")
 	fmt.Println("-" + strings.Repeat("-", 60))
 
 	req := ChatCompletionRequest{
-		Model: "gpt-4o-2024-08-06",
+		Model: "gpt-3.5-turbo",  // Using GPT-3.5 Turbo (faster and cheaper)
 		Messages: []Message{
-			{
-				Role:    "system",
-				Content: "You are a helpful assistant.",
-			},
 			{
 				Role:    "user",
 				Content: "Explain quantum computing in simple terms.",
@@ -287,6 +332,7 @@ func main() {
 				goto StreamComplete
 			}
 			fmt.Print(chunk)
+			os.Stdout.Sync() // Flush output to show streaming in real-time
 			fullResponse.WriteString(chunk)
 
 		case err := <-errorChan:
@@ -308,7 +354,7 @@ StreamComplete:
 	fmt.Println("-" + strings.Repeat("-", 60))
 
 	req2 := ChatCompletionRequest{
-		Model: "gpt-4o-2024-08-06",
+		Model: "gpt-3.5-turbo",
 		Messages: []Message{
 			{
 				Role:    "user",
@@ -361,7 +407,7 @@ StreamComplete:
 
 		// Create request with full conversation history
 		req := ChatCompletionRequest{
-			Model:       "gpt-4o-2024-08-06",
+			Model:       "gpt-3.5-turbo",
 			Messages:    conversationHistory,
 			Stream:      true,
 			MaxTokens:   200,
@@ -374,7 +420,7 @@ StreamComplete:
 		chunkChan, errorChan := connector.ChatCompletionStream(req)
 		var assistantResponse strings.Builder
 
-		streamLoop:
+	streamLoop:
 		for {
 			select {
 			case chunk, ok := <-chunkChan:
@@ -382,6 +428,7 @@ StreamComplete:
 					break streamLoop
 				}
 				fmt.Print(chunk)
+				os.Stdout.Sync() // Flush output immediately
 				assistantResponse.WriteString(chunk)
 
 			case err := <-errorChan:
@@ -407,4 +454,3 @@ StreamComplete:
 	fmt.Println("=" + strings.Repeat("=", 60))
 	fmt.Println("✅ Demo completed successfully!")
 }
-

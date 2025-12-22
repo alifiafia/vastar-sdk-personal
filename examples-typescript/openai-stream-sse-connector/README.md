@@ -7,6 +7,14 @@
 
 ---
 
+## 📚 Documentation
+
+- **[TypeScript SDK Usage Guide](TYPESCRIPT_SDK_USAGE.md)** - Complete guide for using Vastar TypeScript SDK ⭐
+- **[TypeScript SDK README](../../sdk-typescript/README.md)** - SDK overview and API reference
+- **[SDK Source Code](../../sdk-typescript/src/)** - Full SDK implementation
+
+---
+
 ## 📋 Overview
 
 This example demonstrates how to build an OpenAI-compatible connector using the **Vastar Connector SDK for TypeScript**. It showcases:

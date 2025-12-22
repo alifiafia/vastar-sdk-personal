@@ -1,0 +1,23 @@
+# OpenAI Configuration
+
+# Use real OpenAI API or simulator
+use_real_openai: false
+
+# OpenAI API Configuration (when use_real_openai: true)
+openai:
+  api_key: "${OPENAI_API_KEY}"  # Set via environment variable
+  base_url: "https://api.openai.com"
+  model: "gpt-3.5-turbo"
+  timeout_ms: 30000
+
+# RAI Simulator Configuration (when use_real_openai: false)
+simulator:
+  base_url: "http://localhost:4545"
+  timeout_ms: 10000
+
+# Vastar Runtime Configuration
+runtime:
+  socket_path: "/tmp/vastar-connector-runtime.sock"
+  tenant_id: "openai-demo"
+  workspace_id: "demo-workspace"
+

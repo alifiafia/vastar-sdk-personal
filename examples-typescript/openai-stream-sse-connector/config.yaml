@@ -1,0 +1,15 @@
+# OpenAI API Configuration
+openai:
+  api_key: ${OPENAI_API_KEY}
+  base_url: "https://api.openai.com"
+  model: "gpt-3.5-turbo"
+  timeout_ms: 60000
+# Vastar Runtime Configuration
+runtime:
+  tenant_id: "openai-connector"
+  workspace_id: "default"
+  timeout_ms: 60000
+# Simulator Configuration (for testing)
+simulator:
+  enabled: false
+  base_url: "http://localhost:4545"

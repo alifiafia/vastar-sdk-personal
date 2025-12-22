@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vastar-connector-sdk"
+version = "0.1.0"
+description = "Vastar Connector SDK for Python - Build powerful connectors with ease"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Vastar Team", email = "dev@vastar.io"}
+]
+keywords = [
+    "vastar",
+    "connector",
+    "sdk",
+    "ipc",
+    "flatbuffers",
+    "http",
+    "streaming",
+    "sse"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "flatbuffers>=23.5.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "pylint>=2.17.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vastar/connector-sdk-python"
+Documentation = "https://docs.vastar.io/python-sdk"
+Repository = "https://github.com/vastar/connector-sdk-python"
+"Bug Reports" = "https://github.com/vastar/connector-sdk-python/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vastar_connector_sdk*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pylint.messages_control]
+max-line-length = 100
+

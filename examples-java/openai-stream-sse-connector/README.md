@@ -2,8 +2,16 @@
 
 **Streaming Chat Completions with OpenAI-compatible API using Vastar Connector SDK**
 
-[![Java Version](https://img.shields.io/badge/Java-11+-orange?style=flat&logo=java)](https://www.oracle.com/java/)
+[![Java Version](https://img.shields.io/badge/Java-17+-orange?style=flat&logo=java)](https://www.oracle.com/java/)
 [![Gradle](https://img.shields.io/badge/Gradle-8.5-blue?style=flat&logo=gradle)](https://gradle.org/)
+
+---
+
+## 📚 Documentation
+
+- **[Java SDK Usage Guide](JAVA_SDK_USAGE.md)** - Complete guide for using Vastar Connector Java SDK
+- **[Java Developer Guide](../../sdk-java/docs/JAVA_DEVELOPER_GUIDE.md)** - Advanced topics and best practices
+- **[JavaDoc API Reference](../../sdk-java/build/docs/javadoc/)** - Complete API documentation
 
 ---
 

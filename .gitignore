@@ -1,0 +1,23 @@
+# ==== Python Local Artifacts ====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# ==== Local Build Artifacts ====
+build/
+dist/
+*.egg-info/
+
+# ==== Editor / OS Noise ====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+

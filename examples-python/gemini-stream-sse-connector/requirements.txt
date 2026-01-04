@@ -1,0 +1,6 @@
+# Vastar Connector SDK (local path)
+-e ../../sdk-python
+
+# Configuration
+pyyaml>=6.0
+numpy

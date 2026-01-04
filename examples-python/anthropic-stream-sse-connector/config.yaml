@@ -1,0 +1,15 @@
+# Gemini Stream SSE Connector Configuration
+anthropic:
+  api_key: ${ANTHROPIC_API_KEY}
+  base_url: https://api.anthropic.com
+  model: claude-3-haiku-20240307
+  timeout_ms: 60000
+
+runtime:
+  tenant_id: "anthropic-connector"
+  workspace_id: "default"
+  timeout_ms: 60000
+
+simulator:
+  enabled: true
+  base_url: "http://localhost:4545"

@@ -1,0 +1,13 @@
+# Vastar Connector SDK (local path)
+-e ../../sdk-python
+
+# Core HTTP & async
+requests>=2.31.0
+httpx>=0.27.0
+
+# Web server (untuk RAI Simulator & Adapter)
+fastapi>=0.110.0
+uvicorn>=0.27.0
+
+# Utilities
+pyyaml>=6.0

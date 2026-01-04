@@ -1,0 +1,11 @@
+input:
+  prompt:
+    type: string
+    required: true
+  max_tokens:
+    type: number
+    default: 150
+
+output:
+  text:
+    type: string

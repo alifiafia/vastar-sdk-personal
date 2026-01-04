@@ -1,0 +1,23 @@
+# Connector Configuration
+connector:
+  name: gemini-stream-sse
+  version: 1.0.0
+
+# gemini API Configuration
+gemini:
+  api_key: ${GEMINI_API_KEY}
+  base_url: https://generativelanguage.googleapis.com
+  model: gemini-2.5-flash
+  timeout_ms: 60000
+
+# Vastar Runtime Configuration
+runtime:
+  tenant_id: "gemini-connector"
+  workspace_id: "default"
+  timeout_ms: 60000
+
+# Simulator Configuration (for testing)
+simulator:
+  enabled: true
+  base_url: "http://localhost:4545"
+

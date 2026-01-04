@@ -16,8 +16,7 @@ Thumbs.db
 *.log
 
 # Private local projects
-gemini-stream-sse-connector/
-
+examples-python/gemini-stream-sse-connector/
 
 # Do not update typescript examples
 examples-typescript/

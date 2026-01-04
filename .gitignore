@@ -21,3 +21,5 @@ dist/
 Thumbs.db
 *.log
 
+# Private local projects
+gemini-stream-sse-connector/

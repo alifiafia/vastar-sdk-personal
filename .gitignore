@@ -23,3 +23,6 @@ Thumbs.db
 
 # Private local projects
 gemini-stream-sse-connector/
+
+# Do not update typescript examples
+examples-typescript/

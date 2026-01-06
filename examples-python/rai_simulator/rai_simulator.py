@@ -1,13 +1,12 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-import time
 import asyncio
 
 app = FastAPI()
 
-# ===============================
-# Mini knowledge base (offline AI)
-# ===============================
+# ==========================================================
+# Mini knowledge base (offline AI)  ← 100% PUNYAMU
+# ==========================================================
 def smart_answer(prompt: str) -> str:
     p = prompt.lower().strip()
 
@@ -73,23 +72,46 @@ def smart_answer(prompt: str) -> str:
         "automation, and the development of intelligent software solutions."
     )
 
-# ===============================
-# Gemini-style API Endpoint
-# ===============================
-@app.post("/v1beta/models/gemini-2.5-flash:generateContent")
-async def generate(req: Request):
+# ==========================================================
+# Gemini Compatible Endpoint
+# ==========================================================
+@app.post("/v1beta/models/{model}:generateContent")
+async def gemini(model: str, req: Request):
     data = await req.json()
     prompt = data["contents"][0]["parts"][0]["text"]
-
-    # simulasi latency
     await asyncio.sleep(0.05)
-
-    answer = smart_answer(prompt)
 
     return JSONResponse({
         "candidates": [{
             "content": {
-                "parts": [{"text": answer}]
+                "parts": [{"text": smart_answer(prompt)}]
             }
         }]
     })
+
+# ==========================================================
+# OpenAI Compatible Endpoint
+# ==========================================================
+@app.post("/v1/chat/completions")
+async def openai(req: Request):
+    data = await req.json()
+    prompt = data["messages"][-1]["content"]
+    await asyncio.sleep(0.05)
+
+    return {
+        "choices": [{
+            "message": {
+                "content": smart_answer(prompt)
+            }
+        }]
+    }
+
+# ==========================================================
+# Generic API (future connectors)
+# ==========================================================
+@app.post("/generate")
+async def generic(req: Request):
+    data = await req.json()
+    prompt = data.get("prompt", "")
+    await asyncio.sleep(0.05)
+    return {"result": smart_answer(prompt)}

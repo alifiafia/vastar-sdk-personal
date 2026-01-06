@@ -88,7 +88,7 @@ async def main():
     with suppress_stdout():
         for c in clients:
             c.connect()
-    print("🐧 Connected via Unix Socket")
+    print("🐧 Connected via Unix Socket: vastar-connector-runtime.sock")
 
     # Warmup
     for i in range(WARMUP):

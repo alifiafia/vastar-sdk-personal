@@ -17,7 +17,6 @@ MAX_QUEUE = 200
 
 HTTP_TIMEOUT = None
 MAX_RETRY = 2
-
 LATENCY_THRESHOLD = 10000
 STEP = 4
 
@@ -140,18 +139,18 @@ def build_response(request_id, payload):
     return struct.pack("<I", len(buf)) + buf
 
 # ==========================================================
-# Gemini Call
+# Gemini Call — HARD SECURITY GATE
 # ==========================================================
 async def call_gemini(cfg, prompt, client):
     if cfg["simulator"]["enabled"]:
-        url = f"{cfg['simulator']['base_url']}/v1beta/models/gemini-2.5-flash:generateContent"
+        base = cfg["simulator"]["base_url"]
+        if not base.startswith("http://127.0.0.1"):
+            raise RuntimeError("Simulator must be localhost only")
+
+        url = f"{base}/v1beta/models/gemini-2.5-flash:generateContent"
         headers = {"Content-Type": "application/json"}
     else:
-        url = f"{cfg['gemini']['base_url']}/v1beta/models/{cfg['gemini']['model']}:generateContent"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {cfg['gemini']['api_key']}"
-        }
+        raise RuntimeError("External access blocked by security policy")
 
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
@@ -168,11 +167,15 @@ async def call_gemini(cfg, prompt, client):
 # ==========================================================
 async def handle(req, writer, cfg, client):
     global inflight
+
+    if shutting_down:
+        return
+
     start = time.time()
 
     async with inflight_lock:
-        if inflight >= MAX_QUEUE or shutting_down:
-            writer.write(build_response(req.RequestId(), {"status": 503, "body": "Unavailable"}))
+        if inflight >= MAX_QUEUE:
+            writer.write(build_response(req.RequestId(), {"status": 503, "body": "Overloaded"}))
             await writer.drain()
             return
         inflight += 1
@@ -188,10 +191,9 @@ async def handle(req, writer, cfg, client):
         breaker.success()
 
         response = {"status": 200, "headers": {"Content-Type": "application/json"}, "body": answer}
-
     except:
         breaker.failure()
-        response = {"status": 500, "body": "Error"}
+        response = {"status": 500, "body": "Internal Error"}
 
     async with writer_lock:
         writer.write(build_response(req.RequestId(), response))
@@ -230,17 +232,26 @@ async def main():
     log("🚀 Gemini Connector (Production) running")
 
     loop = asyncio.get_running_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: shutdown())
-    loop.add_signal_handler(signal.SIGTERM, lambda: shutdown())
+    loop.add_signal_handler(signal.SIGINT, shutdown)
+    loop.add_signal_handler(signal.SIGTERM, shutdown)
 
-    reader = asyncio.StreamReader()
-    protocol = asyncio.StreamReaderProtocol(reader)
-    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+    # ==========================================================
+    # IPC ONLY when real Vastar runtime is present
+    # ==========================================================
+    enable_ipc = os.environ.get("VASTAR_RUNTIME", "") == "1"
 
-    writer_transport, writer_protocol = await loop.connect_write_pipe(
-        asyncio.streams.FlowControlMixin, sys.stdout
-    )
-    writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, loop)
+    if enable_ipc:
+        reader = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(reader)
+        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+
+        writer_transport, writer_protocol = await loop.connect_write_pipe(
+            asyncio.streams.FlowControlMixin, sys.stdout
+        )
+        writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, loop)
+    else:
+        reader = None
+        writer = None
 
     client = httpx.AsyncClient(
         limits=httpx.Limits(max_connections=300, max_keepalive_connections=120),
@@ -248,13 +259,17 @@ async def main():
     )
 
     while not shutting_down:
+        if not enable_ipc:
+            await asyncio.sleep(0.1)
+            continue
+
         header = await reader.readexactly(4)
         size = struct.unpack("<I", header)[0]
         frame = await reader.readexactly(size)
         req = ExecuteRequest.GetRootAs(frame, 0)
         asyncio.create_task(worker(req, writer, cfg, client))
 
-    log("🛑 Shutting down...")
+    log("🛑 Draining inflight requests...")
 
     while True:
         async with inflight_lock:
@@ -265,9 +280,13 @@ async def main():
     await client.aclose()
     log("✅ Shutdown complete")
 
+
+# ==========================================================
 def shutdown():
     global shutting_down
-    shutting_down = True
+    if not shutting_down:
+        log("🧯 Shutdown signal received")
+        shutting_down = True
 
 if __name__ == "__main__":
     asyncio.run(main())

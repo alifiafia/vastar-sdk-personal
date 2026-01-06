@@ -153,6 +153,46 @@ for q in questions:
         print(f"❌ Error: {response.status_code}")
     print()
 
+
+# =========================================================
+# Example 4: Streaming (SSE)
+# =========================================================
+print("Example 4: Streaming SSE")
+print("─" * 61)
+print("User: Explain how neural networks learn.")
+print("AI: ")
+
+request = HTTPRequest(
+    method="POST",
+    url="http://localhost:4545/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+    headers={"Content-Type": "application/json"},
+    body=json.dumps(make_payload("Explain how neural networks learn.")).encode("utf-8"),
+    timeout_ms=60000,
+)
+
+response = client.execute_http(request)
+
+if HTTPResponseHelper.is_2xx(response):
+    raw = HTTPResponseHelper.get_body_as_string(response)
+
+    parser = SSEParser()
+
+    # parse full SSE payload
+    events = parser.parse(raw)
+
+    for event in events:
+        if event.data == "[DONE]":
+            break
+
+        payload = json.loads(event.data)
+        text = payload["candidates"][0]["content"]["parts"][0]["text"]
+        print(text, end="", flush=True)
+
+    print("\n" + "─" * 61)
+else:
+    print(f"❌ Error: {response.status_code}")
+
+
 print("═" * 61)
 print("✅ All examples completed successfully!")
 

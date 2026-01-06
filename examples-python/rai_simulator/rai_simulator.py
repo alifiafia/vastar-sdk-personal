@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import asyncio
+import json
 
 app = FastAPI()
 
@@ -88,6 +89,34 @@ async def gemini(model: str, req: Request):
             }
         }]
     })
+
+# ==========================================================
+# Gemini Streaming SSE Endpoint
+# ==========================================================
+@app.post("/v1beta/models/{model}:streamGenerateContent")
+async def gemini_stream(model: str, req: Request):
+
+    data = await req.json()
+    prompt = data["contents"][0]["parts"][0]["text"]
+
+    async def event_generator():
+        answer = smart_answer(prompt)
+
+        for word in answer.split():
+            payload = {
+                "candidates": [{
+                    "content": {
+                        "parts": [{"text": word + " "}]
+                    }
+                }]
+            }
+
+            yield f"data: {json.dumps(payload)}\n\n"
+            await asyncio.sleep(0.05)
+
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # ==========================================================
 # OpenAI Compatible Endpoint

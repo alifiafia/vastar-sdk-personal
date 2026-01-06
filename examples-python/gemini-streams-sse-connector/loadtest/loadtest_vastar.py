@@ -1,61 +1,74 @@
-import sys, json, time, asyncio, builtins
-from concurrent.futures import ThreadPoolExecutor
+import sys, json, time, asyncio, os
 from statistics import mean
+from collections import deque
+from contextlib import contextmanager
 
+# Import Vastar SDK
 sys.path.insert(0, '../../../sdk-python')
-from vastar_connector_sdk import RuntimeClient, HTTPRequest, RuntimeConfig, HTTPResponseHelper
+from vastar_connector_sdk import (
+    RuntimeClient,
+    HTTPRequest,
+    RuntimeConfig,
+    HTTPResponseHelper
+)
 
 # ===============================
 # CONFIG
 # ===============================
-TOTAL = 100
-CONCURRENCY = 10
+TOTAL        = 100
+CONCURRENCY  = 50
+WARMUP       = 10
+TIMEOUT_MS   = 60000
 URL = "http://localhost:4545/v1beta/models/gemini-2.5-flash:generateContent"
 
-latencies = []
-success = 0
-failed = 0
+latencies = deque()
+success   = 0
+failed    = 0
+stats_lock = asyncio.Lock()
 
 # ===============================
-# SILENCE SDK OUTPUT SAFELY
+# STDOUT SUPPRESSION
 # ===============================
-def silent_call(fn):
-    def wrapper(*a, **k):
-        old_print = builtins.print
-        builtins.print = lambda *x, **y: None
-        try:
-            return fn(*a, **k)
-        finally:
-            builtins.print = old_print
-    return wrapper
+@contextmanager
+def suppress_stdout():
+    fd = sys.stdout.fileno()
+    saved = os.dup(fd)
+    with open(os.devnull, "w") as null:
+        os.dup2(null.fileno(), fd)
+    try:
+        yield
+    finally:
+        os.dup2(saved, fd)
+        os.close(saved)
 
 # ===============================
-# WORKER
+# REQUEST BUILDER
 # ===============================
-@silent_call
-def worker(i):
-    client = RuntimeClient(RuntimeConfig(timeout_ms=60000))
-    client.connect()
-
-    payload = {"contents": [{"parts": [{"text": f"Explain AI {i}"}]}]}
-
-    request = HTTPRequest(
+def build_request(i):
+    payload = {
+        "contents": [
+            {"parts": [{"text": f"Explain AI {i}"}]}
+        ]
+    }
+    return HTTPRequest(
         method="POST",
         url=URL,
         headers={"Content-Type": "application/json"},
         body=json.dumps(payload).encode(),
-        timeout_ms=60000,
+        timeout_ms=TIMEOUT_MS,
     )
 
+# ===============================
+# WORKER
+# ===============================
+def worker(client, i):
     start = time.time()
     try:
-        response = client.execute_http(request)
+        response = client.execute_http(build_request(i))
         ok = HTTPResponseHelper.is_2xx(response)
-    except:
+    except Exception:
         ok = False
-
     elapsed = (time.time() - start) * 1000
-    client.close()
     return ok, elapsed
 
 # ===============================
@@ -64,38 +77,60 @@ def worker(i):
 async def main():
     global success, failed
 
-    print(f"\n🚀 Memulai Load Test Vastar (Konkursensi: {CONCURRENCY})...")
+    print(f"\n🚀  Memulai Vastar LoadTest (Concurrency={CONCURRENCY})")
     print("⏳ Progress: ", end="", flush=True)
 
-    start_all = time.time()
-    loop = asyncio.get_running_loop()
+    config = RuntimeConfig(timeout_ms=TIMEOUT_MS)
 
-    with ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
-        results = await asyncio.gather(
-            *[loop.run_in_executor(pool, worker, i) for i in range(TOTAL)]
-        )
+    clients = [RuntimeClient(config) for _ in range(CONCURRENCY)]
+
+    # Silent connect
+    with suppress_stdout():
+        for c in clients:
+            c.connect()
+    print("🐧 Connected via Unix Socket")
+
+    # Warmup
+    for i in range(WARMUP):
+        await asyncio.to_thread(worker, clients[0], i)
+
+    sem = asyncio.Semaphore(CONCURRENCY)
+    start_all = time.time()
+
+    async def run(i):
+        global success, failed
+        async with sem:
+            ok, t = await asyncio.to_thread(worker, clients[i % CONCURRENCY], i)
+            async with stats_lock:
+                latencies.append(t)
+                success += int(ok)
+                failed += int(not ok)
+                print("█", end="", flush=True)
+
+    await asyncio.gather(*(run(i) for i in range(TOTAL)))
 
     total_time = (time.time() - start_all) * 1000
 
-    for ok, t in results:
-        latencies.append(t)
-        success += ok
-        failed += not ok
-        print("█", end="", flush=True)
+    # Silent close
+    with suppress_stdout():
+        for c in clients:
+            c.close()
+    print("\n✅ Connection closed")
 
     lat_sorted = sorted(latencies)
 
-    print("\n\n📊 HASIL PENGUJIAN: VASTAR CONNECTOR")
-    print("-" * 50)
-    print(f"- Total Request   : {TOTAL}")
-    print(f"- Berhasil (2xx)  : {success}")
-    print(f"- Gagal/Error    : {failed}")
-    print(f"- Total Waktu    : {int(total_time)} ms")
-    print(f"- Rata-rata      : {mean(latencies):.2f} ms/req")
-    print(f"- Min Latency    : {min(lat_sorted):.2f} ms")
-    print(f"- Max Latency    : {max(lat_sorted):.2f} ms")
-    print(f"- P50 (Median)   : {lat_sorted[int(TOTAL*0.5)]:.2f} ms")
-    print(f"- P95            : {lat_sorted[int(TOTAL*0.95)-1]:.2f} ms")
-    print("-" * 50)
+    # Report
+    print("\n📊 HASIL LOAD TEST: VASTAR CONNECTOR")
+    print("-" * 55)
+    print(f"Requests      : {TOTAL}")
+    print(f"Success       : {success}")
+    print(f"Failed        : {failed}")
+    print(f"Total         : {int(total_time)} ms")
+    print(f"Avg           : {mean(lat_sorted):.2f} ms")
+    print(f"Min (Latency) : {min(lat_sorted):.2f} ms")
+    print(f"Max (Latency) : {max(lat_sorted):.2f} ms")
+    print(f"P50           : {lat_sorted[int(TOTAL * 0.50)]:.2f} ms")
+    print(f"P95           : {lat_sorted[int(TOTAL * 0.95) - 1]:.2f} ms")
+    print("-" * 55)
 
 asyncio.run(main())

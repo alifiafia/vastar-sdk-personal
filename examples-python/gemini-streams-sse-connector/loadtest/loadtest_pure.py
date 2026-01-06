@@ -3,7 +3,7 @@ from statistics import mean
 import builtins
 
 TOTAL = 100
-CONCURRENCY = 20
+CONCURRENCY = 50
 URL = "http://localhost:4545/v1beta/models/gemini-2.5-flash:generateContent"
 
 latencies = []
@@ -27,7 +27,7 @@ async def worker(i, client):
 async def main():
     global success, failed
 
-    print(f"\n🚀 Memulai Pure Python Load Test (Konkursensi: {CONCURRENCY})...")
+    print(f"\n🚀 Memulai Pure Python LoadTest (Konkursensi: {CONCURRENCY})...")
     print("⏳ Progress: ", end="", flush=True)
 
     sem = asyncio.Semaphore(CONCURRENCY)
@@ -52,16 +52,16 @@ async def main():
     lat_sorted = sorted(latencies)
 
     print("\n\n📊 HASIL PENGUJIAN: PURE PYTHON")
-    print("-" * 50)
-    print(f"- Total Request   : {TOTAL}")
-    print(f"- Berhasil (2xx)  : {success}")
-    print(f"- Gagal/Error    : {failed}")
-    print(f"- Total Waktu    : {int(total_time)} ms")
-    print(f"- Rata-rata      : {mean(latencies):.2f} ms/req")
-    print(f"- Min Latency    : {min(lat_sorted):.2f} ms")
-    print(f"- Max Latency    : {max(lat_sorted):.2f} ms")
-    print(f"- P50 (Median)   : {lat_sorted[int(TOTAL*0.5)]:.2f} ms")
-    print(f"- P95            : {lat_sorted[int(TOTAL*0.95)-1]:.2f} ms")
-    print("-" * 50)
+    print("-" * 55)
+    print(f"Requests      : {TOTAL}")
+    print(f"Success       : {success}")
+    print(f"Failed        : {failed}")
+    print(f"Total         : {int(total_time)} ms")
+    print(f"Avg           : {mean(lat_sorted):.2f} ms")
+    print(f"Min (Latency) : {min(lat_sorted):.2f} ms")
+    print(f"Max (Latency) : {max(lat_sorted):.2f} ms")
+    print(f"P50           : {lat_sorted[int(TOTAL * 0.50)]:.2f} ms")
+    print(f"P95           : {lat_sorted[int(TOTAL * 0.95) - 1]:.2f} ms")
+    print("-" * 55)
 
 asyncio.run(main())

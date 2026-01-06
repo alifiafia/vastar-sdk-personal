@@ -24,7 +24,7 @@ dengan dukungan:
 
 ```
 gemini-streams-sse-connector/
-├── gemini_adapter.py         # Gemini RAI simulator
+├── main.py                   # Gemini Adapter API (FastAPI)
 ├── test_gemini_simulator.py  # Main demo script
 ├── test_simple.py            # Minimal connectivity test
 ├── phase1_test_gemini.py     # Basic runtime validation
